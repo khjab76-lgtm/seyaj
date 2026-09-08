@@ -1,0 +1,30 @@
+{
+  "status": "partial_success",
+  "results": [
+    {
+      "status": "success",
+      "filename": "seyaj-logo-full-white.png",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuvmyhyaakna/seyaj-logo-full-white.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuvmyhyaakna/seyaj-logo-full-white.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuvmyhyaakna/seyaj-logo-full-white.png"
+    },
+    {
+      "status": "success",
+      "filename": "seyaj-shield-dark-bg.png",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuxmekqcakna/seyaj-shield-dark-bg.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuxmekqcakna/seyaj-shield-dark-bg.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuxmekqcakna/seyaj-shield-dark-bg.png"
+    },
+    {
+      "status": "success",
+      "filename": "seyaj-shield-light-bg.png",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuxmezacakpq/seyaj-shield-light-bg.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuxmezacakpq/seyaj-shield-light-bg.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/1574146/2026-09-01/vuxmezacakpq/seyaj-shield-light-bg.png"
+    }
+  ],
+  "success_count": 3,
+  "failed_count": 7,
+  "running_count": 0,
+  "message": "Generated 3/10 images total"
+}

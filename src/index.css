@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* سياج — هوية الشعار: كحلي نيلي #202359 / #302E7A + أحمر #ED2024 */
+    --background: 228 30% 98%;
+    --foreground: 236 40% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 236 40% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 236 40% 14%;
+
+    --primary: 236 47% 24%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 232 28% 94%;
+    --secondary-foreground: 236 50% 18%;
+
+    --muted: 232 25% 95%;
+    --muted-foreground: 236 15% 45%;
+
+    --accent: 350 80% 95%;
+    --accent-foreground: 236 50% 18%;
+
+    --destructive: 358 85% 53%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 232 20% 90%;
+    --input: 232 20% 88%;
+    --ring: 358 85% 53%;
+
+    --radius: 0.6rem;
+
+    --gold: 358 85% 53%;
+
+    --success: 152 58% 36%;
+    --success-foreground: 150 40% 96%;
+    --warning: 36 92% 48%;
+    --warning-foreground: 40 80% 12%;
+    --info: 242 45% 40%;
+    --info-foreground: 230 60% 96%;
+
+    --sidebar-background: 240 48% 15%;
+    --sidebar-foreground: 232 25% 90%;
+    --sidebar-primary: 358 85% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 40% 24%;
+    --sidebar-accent-foreground: 350 90% 92%;
+    --sidebar-border: 240 40% 26%;
+    --sidebar-ring: 358 85% 53%;
+  }
+
+  .dark {
+    --background: 240 48% 9%;
+    --foreground: 232 25% 94%;
+    --card: 240 45% 13%;
+    --card-foreground: 232 25% 94%;
+    --popover: 240 45% 13%;
+    --popover-foreground: 232 25% 94%;
+    --primary: 358 85% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 40% 20%;
+    --secondary-foreground: 232 25% 94%;
+    --muted: 240 40% 18%;
+    --muted-foreground: 232 15% 65%;
+    --accent: 240 40% 24%;
+    --accent-foreground: 350 90% 92%;
+    --destructive: 358 75% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 40% 24%;
+    --input: 240 40% 26%;
+    --ring: 358 85% 60%;
+    --gold: 358 85% 62%;
+    --sidebar-background: 240 50% 10%;
+    --sidebar-foreground: 232 25% 90%;
+    --sidebar-accent: 240 40% 20%;
+    --sidebar-border: 240 40% 20%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    direction: rtl;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display font-bold tracking-tight text-balance;
+  }
+}
+
+@layer utilities {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media print {
+  aside, header, nav, .no-print {
+    display: none !important;
+  }
+  /* مع وجود ورق رسمي: اعزل منطقة الطباعة فقط */
+  body:has(.seyaj-print-area) * {
+    visibility: hidden !important;
+  }
+  body:has(.seyaj-print-area) .seyaj-print-area,
+  body:has(.seyaj-print-area) .seyaj-print-area * {
+    visibility: visible !important;
+  }
+  /* بدون ورق رسمي: اطبع محتوى main كاملاً وأخفِ الطبقات العائمة */
+  body:not(:has(.seyaj-print-area)) * {
+    visibility: hidden !important;
+  }
+  body:not(:has(.seyaj-print-area)) main,
+  body:not(:has(.seyaj-print-area)) main * {
+    visibility: visible !important;
+  }
+  /* منع طباعة نماذج الإدخال — النوافذ المنبثقة لا تُطبع إلا إذا احتوت منطقة الطباعة الرسمية */
+  body:not(:has(.seyaj-print-area)) .seyaj-modal {
+    display: none !important;
+  }
+  body:not(:has(.seyaj-print-area)) .fixed {
+    display: none !important;
+  }
+  html, body {
+    background: #ffffff !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  * {
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  body:has(.seyaj-print-area) .seyaj-print-area {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: auto !important;
+  }
+  thead {
+    display: table-header-group !important;
+  }
+  tfoot {
+    display: table-footer-group !important;
+  }
+  tr, .avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  th, td {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .sticky {
+    position: static !important;
+  }
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}
