@@ -65,6 +65,7 @@ const inputCls = 'h-9 w-full rounded-lg border bg-background px-3 text-sm outlin
 export function TextInput(props: any) {
   return <input className={inputCls} {...props} />;
 }
+export const Input = TextInput;
 
 export function TextArea(props: any) {
   return <textarea className={'min-h-20 w-full rounded-lg border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring ' + (props.className || '')} {...props} />;

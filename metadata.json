@@ -1,0 +1,6 @@
+{
+  "name": "سياج - شركة الحراسات الأمنية الخاصة",
+  "description": "نظام متكامل لإدارة الموظفين والحضور والمواقع والصلاحيات لشركة سياج للحراسات الأمنية الخاصة",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -74,6 +74,9 @@ export const VIOLATION_FLOW = [
   { code: 'ops_approved', label: 'معتمدة (مدير العمليات)' },
   { code: 'hr_approved', label: 'معتمدة (الموارد البشرية)' },
   { code: 'hr_rejected', label: 'مرفوضة (الموارد البشرية)' },
+  { code: 'objected', label: 'اعتراض قيد الدراسة' },
+  { code: 'objection_accepted', label: 'اعتراض مقبول (ملغاة)' },
+  { code: 'objection_rejected', label: 'اعتراض مرفوض (مثبتة)' },
   { code: 'signed', label: 'موقعة من الموظف' },
   { code: 'deducted', label: 'مخصومة من الراتب' },
 ];

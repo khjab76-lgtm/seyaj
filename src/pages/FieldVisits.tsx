@@ -30,19 +30,32 @@ function fromBackend(r: any) {
 }
 
 export default function FieldVisits() {
-  const { sites, projects, employees } = useStore();
+  const { sites, projects, employees, fieldVisits, visitCrud, currentUser } = useStore();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [form, setForm] = useState<any>(null);
   const [visits, setVisits] = useState<any[]>([]);
 
-  const reload = () => fetchFieldVisits().then((rows) => setVisits(rows.map(fromBackend)));
-  useEffect(() => { reload(); }, []);
+  const reload = () => {
+    fetchFieldVisits()
+      .then((rows) => {
+        if (rows && rows.length > 0) {
+          setVisits(rows.map(fromBackend));
+        } else {
+          setVisits(fieldVisits || []);
+        }
+      })
+      .catch(() => {
+        setVisits(fieldVisits || []);
+      });
+  };
+
+  useEffect(() => { reload(); }, [fieldVisits]);
 
   const newForm = () => {
     setForm({
-      id: 0, employeeCode: '', project: '', site: '', siteCode: '', clientName: '', supervisorName: '', visitDate: '2026-09-01', shift: 'صباحية',
+      id: 0, employeeCode: '', project: '', site: '', siteCode: '', clientName: '', supervisorName: currentUser?.name || 'مشرف العمليات', visitDate: new Date().toISOString().slice(0, 10), shift: 'صباحية',
       rows: [emptyRow(1)],
       evaluation: Object.fromEntries(CHECKLIST_ITEMS.map((i) => [i, false])),
       correctiveAction: '', notes: '', branchManagerSign: '', branchStamp: '', status: 'مسودة',
@@ -58,15 +71,23 @@ export default function FieldVisits() {
 
   const save = async () => {
     if (!form.site || !form.supervisorName) { toast.show('حدد الموقع واسم المشرف'); return; }
-    await saveFieldVisitBackend({
-      employee_code: form.employeeCode || '', project: form.project || '', site: form.site || '', site_code: form.siteCode || '',
-      client_name: form.clientName || '', supervisor_name: form.supervisorName, visit_date: form.visitDate || '',
-      shift: form.shift || '', rows_data: JSON.stringify(form.rows), evaluation: JSON.stringify(form.evaluation),
-      corrective_action: form.correctiveAction || '', notes: form.notes || '', branch_manager_sign: form.branchManagerSign || '',
-      branch_stamp: form.branchStamp || '', status: form.status || 'مسودة',
-    }, ACTOR);
+    try {
+      await saveFieldVisitBackend({
+        employee_code: form.employeeCode || '', project: form.project || '', site: form.site || '', site_code: form.siteCode || '',
+        client_name: form.clientName || '', supervisor_name: form.supervisorName, visit_date: form.visitDate || '',
+        shift: form.shift || '', rows_data: JSON.stringify(form.rows), evaluation: JSON.stringify(form.evaluation),
+        corrective_action: form.correctiveAction || '', notes: form.notes || '', branch_manager_sign: form.branchManagerSign || '',
+        branch_stamp: form.branchStamp || '', status: form.status || 'مسودة',
+      }, currentUser?.name || ACTOR);
+    } catch {
+      // persist in store if backend unavailable
+      visitCrud.add({
+        ...form,
+        id: Date.now(),
+      });
+    }
     setOpen(false);
-    toast.show('حُفظ نموذج المرور الميداني في الخادم');
+    toast.show('حُفظ نموذج المرور الميداني بنجاح');
     reload();
   };
 

@@ -32,6 +32,8 @@ import ImportPayroll from '@/pages/hr/ImportPayroll';
 import MobileApp from '@/pages/MobileApp';
 import MapCenter from '@/pages/MapCenter';
 import AuthReturn from '@/pages/AuthReturn';
+import Alerts from '@/pages/Alerts';
+import AuditLog from '@/pages/AuditLog';
 
 const queryClient = new QueryClient();
 
@@ -50,6 +52,8 @@ const AppRoutes = () => (
       <Route path="/requests" element={<Requests />} />
       <Route path="/patrols" element={<Patrols />} />
       <Route path="/handovers" element={<Handovers />} />
+      <Route path="/alerts" element={<Alerts />} />
+      <Route path="/audit" element={<AuditLog />} />
       <Route path="/reports" element={<Reports />} />
       <Route path="/smart-reports" element={<SmartReports />} />
       <Route path="/sites-capacity" element={<SitesCapacity />} />

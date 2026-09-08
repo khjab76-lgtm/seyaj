@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Download, Printer, BarChart3, Users, CalendarCheck, AlertTriangle } from 'lucide-react';
+import { Download, Printer, BarChart3, Users, CalendarCheck, AlertTriangle, FileText, Eye } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { PageToolbar, Btn, StatCard, Table, EmptyRow, useToast } from '@/components/ui-kit';
+import { PageToolbar, Btn, StatCard, Table, EmptyRow, Modal, useToast } from '@/components/ui-kit';
+import OfficialPaper from '@/components/OfficialPaper';
 import { TODAY } from '@/data/mock';
 
 export default function Reports() {
   const { employees, attendance, projects, sites, requests, alerts, exportCSV } = useStore();
   const toast = useToast();
   const [range, setRange] = useState('today');
+  const [pdfPreview, setPdfPreview] = useState(false);
 
   const today = attendance.filter((a: any) => a.date === TODAY);
   const present = today.filter((a: any) => a.status === 'حاضر' || a.status === 'منصرف').length;
@@ -42,9 +44,39 @@ export default function Reports() {
   }));
 
   const exportReport = () => {
-    exportCSV('report_projects.csv', byProject.map((r: any) => ({ المشروع: r.name, الكود: r.code, الطاقم: r.staff, حاضرون: r.present, متأخرون: r.late, غائبون: r.absent })));
-    toast.show('تم تصدير تقرير المشاريع');
+    exportCSV(
+      'report_projects.csv',
+      byProject.map((r: any) => ({
+        المشروع: r.name,
+        الكود: r.code,
+        'طاقم الحراسة': r.staff,
+        حاضرون: r.present,
+        متأخرون: r.late,
+        غائبون: r.absent,
+        'نسبة التغطية': r.staff ? Math.round((r.present / r.staff) * 100) + '%' : '0%',
+      }))
+    );
+    toast.show('تم تصدير تقرير المشاريع بصيغة CSV / Excel');
   };
+
+  const exportSitesReport = () => {
+    exportCSV(
+      'report_sites.csv',
+      bySite.map((s: any) => ({
+        الموقع: s.name,
+        الكود: s.code,
+        'عدد القوة الأمنية': s.count,
+      }))
+    );
+    toast.show('تم تصدير تقرير توزيع المواقع بصيغة CSV / Excel');
+  };
+
+  const reportMeta = [
+    { k: 'فترة التقرير', v: range === 'today' ? 'اليوم ' + TODAY : range === 'week' ? 'الأسبوع الحالي' : 'الشهر الحالي' },
+    { k: 'إجمالي الموظفين', v: employees.length + ' فرد أمن' },
+    { k: 'نسبة الحضور', v: rate + '%' },
+    { k: 'المواقع النشطة', v: sites.length + ' موقع' },
+  ];
 
   return (
     <div>
@@ -53,13 +85,21 @@ export default function Reports() {
         subtitle="مؤشرات الأداء التشغيلية على مستوى المشاريع والمواقع"
         actions={
           <>
-            <select value={range} onChange={(e: any) => setRange(e.target.value)} className="h-9 rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring">
+            <select
+              value={range}
+              onChange={(e: any) => setRange(e.target.value)}
+              className="h-9 rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
               <option value="today">اليوم</option>
               <option value="week">الأسبوع الحالي</option>
               <option value="month">الشهر الحالي</option>
             </select>
-            <Btn variant="outline" onClick={exportReport}><Download className="h-4 w-4" /> تصدير التقرير</Btn>
-            <Btn variant="primary" onClick={() => window.print()}><Printer className="h-4 w-4" /> طباعة</Btn>
+            <Btn variant="outline" onClick={exportReport}>
+              <Download className="h-4 w-4" /> تصدير Excel / CSV
+            </Btn>
+            <Btn variant="primary" onClick={() => setPdfPreview(true)}>
+              <FileText className="h-4 w-4" /> معاينة التقرير الرسمي (PDF)
+            </Btn>
           </>
         }
       />
@@ -111,7 +151,12 @@ export default function Reports() {
         </div>
       </div>
       <div className="mt-4">
-        <h3 className="mb-3 font-cairo text-sm font-bold">التوزيع على المواقع</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-cairo text-sm font-bold">التوزيع على المواقع الأمنية</h3>
+          <Btn size="sm" variant="outline" onClick={exportSitesReport}>
+            <Download className="h-3.5 w-3.5" /> تصدير المواقع
+          </Btn>
+        </div>
         <Table head={['الموقع', 'الكود', 'عدد الموظفين']}>
           {bySite.length === 0 && <EmptyRow colSpan={3} />}
           {bySite.map((s: any) => (
@@ -123,6 +168,60 @@ export default function Reports() {
           ))}
         </Table>
       </div>
+
+      {/* Official Paper Modal for PDF Export / Printing */}
+      <Modal open={pdfPreview} onClose={() => setPdfPreview(false)} title="معاينة التقرير الرسمي — طباعة / تصدير PDF" wide>
+        <OfficialPaper
+          title="التقرير التشغيلي الدوري للقوة الأمنية والمشاريع"
+          subtitle="سجل الأداء والمتابعة الميدانية للحراسات الأمنية الخاصة"
+          meta={reportMeta}
+        >
+          <div className="space-y-4 text-xs">
+            <div>
+              <h4 className="font-bold text-navy-900 border-b pb-1 mb-2">أولاً: ملخص حضور المشاريع</h4>
+              <table className="w-full text-right border-collapse text-[11px]">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300">
+                    <th className="p-2">المشروع</th>
+                    <th className="p-2">الكود</th>
+                    <th className="p-2">طاقم الحراسة</th>
+                    <th className="p-2">حاضرون</th>
+                    <th className="p-2">متأخرون</th>
+                    <th className="p-2">غائبون</th>
+                    <th className="p-2">نسبة الانضباط</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byProject.map((p: any) => (
+                    <tr key={p.code} className="border-b border-slate-200">
+                      <td className="p-2 font-bold">{p.name}</td>
+                      <td className="p-2 font-mono">{p.code}</td>
+                      <td className="p-2">{p.staff}</td>
+                      <td className="p-2 text-emerald-700 font-bold">{p.present}</td>
+                      <td className="p-2 text-amber-700">{p.late}</td>
+                      <td className="p-2 text-rose-700">{p.absent}</td>
+                      <td className="p-2 font-bold">{p.staff ? Math.round((p.present / p.staff) * 100) : 0}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-navy-900 border-b pb-1 mb-2">ثانياً: التوزيع الجغرافي للمواقع</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {bySite.map((s: any) => (
+                  <div key={s.code} className="p-2 border rounded bg-slate-50">
+                    <div className="font-bold text-slate-800">{s.name}</div>
+                    <div className="text-[10px] text-slate-500">كود: {s.code} | القوة: {s.count} فرد</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </OfficialPaper>
+      </Modal>
+
       {toast.node}
     </div>
   );

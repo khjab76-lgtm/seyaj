@@ -75,9 +75,9 @@ export const seedAlerts = [
 ];
 
 export const seedRoles = [
-  { id: 1, name: 'مدير النظام', desc: 'صلاحية كاملة على جميع الوحدات', perms: ['dashboard', 'employees', 'attendance', 'projects', 'sites', 'zones', 'requests', 'reports', 'permissions'] },
-  { id: 2, name: 'مدير عمليات', desc: 'إدارة الموظفين والحضور والمشاريع', perms: ['dashboard', 'employees', 'attendance', 'projects', 'sites', 'requests', 'reports'] },
-  { id: 3, name: 'مشرف موقع', desc: 'متابعة الحضور والطلبات في موقعه', perms: ['dashboard', 'attendance', 'requests'] },
-  { id: 4, name: 'موظف موارد بشرية', desc: 'إدارة بيانات الموظفين فقط', perms: ['dashboard', 'employees', 'reports'] },
-  { id: 5, name: 'قارئ تقارير', desc: 'عرض التقارير ولوحة التحكم', perms: ['dashboard', 'reports'] },
+  { id: 1, name: 'مدير النظام', desc: 'صلاحية كاملة وإدارة مركزية لجميع الوحدات والإعدادات', perms: ['all', 'dashboard', 'employees', 'attendance', 'patrols', 'handovers', 'projects', 'sites', 'zones', 'permissions', 'requests', 'reports', 'visits', 'violations', 'finance', 'settings', 'audit'] },
+  { id: 2, name: 'مدير عمليات', desc: 'إدارة العمليات الميدانية والموظفين والدوريات والمخالفات', perms: ['dashboard', 'employees', 'attendance', 'patrols', 'handovers', 'projects', 'sites', 'zones', 'requests', 'reports', 'visits', 'violations'] },
+  { id: 3, name: 'مشرف موقع', desc: 'متابعة الحضور الميداني والدوريات وجولات التفتيش وطلبات الموقع', perms: ['dashboard', 'attendance', 'patrols', 'handovers', 'sites', 'requests', 'visits', 'violations'] },
+  { id: 4, name: 'موظف موارد بشرية', desc: 'إدارة شؤون الموظفين والرواتب والإنذارات والتدقيق', perms: ['dashboard', 'employees', 'requests', 'reports', 'finance', 'audit'] },
+  { id: 5, name: 'قارئ تقارير', desc: 'عرض المؤشرات التشغيلية والتقارير الإحصائية فقط', perms: ['dashboard', 'reports'] },
 ];
