@@ -38,6 +38,7 @@ import Alerts from '@/pages/Alerts';
 import AuditLog from '@/pages/AuditLog';
 import Login from '@/pages/Login';
 import Monitor from '@/pages/Monitor';
+import BusinessHub from '@/pages/BusinessHub';
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const AppRoutes = () => (
     <Route path="/auth/callback" element={<AuthReturn />} />
     <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
       <Route path="/" element={<Dashboard />} />
+      <Route path="/business" element={<BusinessHub />} />
       <Route path="/employees" element={<Employees />} />
       <Route path="/attendance" element={<Attendance />} />
       <Route path="/projects" element={<Projects />} />
