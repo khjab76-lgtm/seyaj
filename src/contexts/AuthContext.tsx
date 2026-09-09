@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authApi } from '../lib/auth';
-import { getCurrentSupabaseUser, isSupabaseAuthEnabled, signInWithPassword, signOutSupabase } from '@/lib/supabaseAuth';
+import { getCurrentSupabaseUser, getSupabaseProfile, isSupabaseAuthEnabled, signInWithPassword, signOutSupabase } from '@/lib/supabaseAuth';
 
 type User = { id: string; email: string; name?: string; role: string; last_login?: string };
 interface AuthContextType {
@@ -21,6 +21,16 @@ export const useAuth = () => {
   return context;
 };
 
+async function buildSupabaseUser(su: { id: string; email: string; user_metadata?: Record<string, unknown> }): Promise<User> {
+  const profile = await getSupabaseProfile(su.id);
+  return {
+    id: su.id,
+    email: su.email,
+    name: String(profile?.full_name || su.user_metadata?.full_name || ''),
+    role: String(profile?.role_code || 'viewer'),
+  };
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const supabaseMode = isSupabaseAuthEnabled();
   const [user, setUser] = useState<User | null>(null);
@@ -33,8 +43,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (supabaseMode) {
         const su = await getCurrentSupabaseUser();
         if (!su) { setUser(null); return; }
-        const role = String(su.user_metadata?.role || 'viewer');
-        setUser({ id: su.id, email: su.email, name: String(su.user_metadata?.full_name || ''), role });
+        setUser(await buildSupabaseUser(su));
       } else {
         setUser(await authApi.getCurrentUser());
       }
@@ -53,8 +62,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     try {
       const result = await signInWithPassword(email, password);
-      const meta = result.user?.user_metadata || {};
-      setUser({ id: result.user?.id || '', email: result.user?.email || email, name: String(meta.full_name || ''), role: String(meta.role || 'viewer') });
+      if (!result.user?.id || !result.user.email) throw new Error('تعذر قراءة بيانات المستخدم بعد تسجيل الدخول');
+      setUser(await buildSupabaseUser(result.user as { id: string; email: string; user_metadata?: Record<string, unknown> }));
     } catch (err) { setError(err instanceof Error ? err.message : 'فشل تسجيل الدخول'); throw err; }
   };
 
