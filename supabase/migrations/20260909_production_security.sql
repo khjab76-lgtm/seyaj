@@ -1,5 +1,5 @@
 -- Seyaj production hardening and missing shared tables.
--- Safe to run after the existing project schema; all DDL is idempotent.
+-- Safe for the existing project: additive/idempotent changes only.
 create extension if not exists pgcrypto;
 
 alter table public.clients add column if not exists notes text;
@@ -28,7 +28,6 @@ create table if not exists public.contracts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.communication_templates (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -38,7 +37,6 @@ create table if not exists public.communication_templates (
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.ai_policies (
   key text primary key,
   label text not null,
@@ -46,7 +44,6 @@ create table if not exists public.ai_policies (
   description text,
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.ai_tasks (
   id uuid primary key default gen_random_uuid(),
   agent text not null,
@@ -62,7 +59,6 @@ create table if not exists public.ai_tasks (
   created_at timestamptz not null default now(),
   completed_at timestamptz
 );
-
 create table if not exists public.communication_log (
   id uuid primary key default gen_random_uuid(),
   channel text not null check (channel in ('email','whatsapp')),
@@ -76,7 +72,6 @@ create table if not exists public.communication_log (
   sent_at timestamptz,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
   actor_id uuid,
@@ -89,7 +84,6 @@ create table if not exists public.audit_logs (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.seyaj_user_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
@@ -106,15 +100,8 @@ create index if not exists idx_audit_logs_created on public.audit_logs(created_a
 create index if not exists idx_employee_auth_user on public.employees(auth_user_id);
 
 create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-security invoker
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+returns trigger language plpgsql security invoker as $$
+begin new.updated_at = now(); return new; end; $$;
 
 drop trigger if exists trg_contracts_updated_at on public.contracts;
 create trigger trg_contracts_updated_at before update on public.contracts for each row execute function public.set_updated_at();
@@ -124,89 +111,139 @@ drop trigger if exists trg_user_profiles_updated_at on public.seyaj_user_profile
 create trigger trg_user_profiles_updated_at before update on public.seyaj_user_profiles for each row execute function public.set_updated_at();
 
 create or replace function public.is_seyaj_admin()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
+returns boolean language sql stable security definer set search_path = public as $$
   select exists (
-    select 1
-    from public.seyaj_user_profiles p
-    where p.id = auth.uid()
-      and p.active = true
-      and p.role_code in ('admin','manager','system_admin')
+    select 1 from public.seyaj_user_profiles
+    where id = auth.uid() and active = true
+      and role_code in ('admin','manager','system_admin')
   );
 $$;
 
-alter table public.seyaj_user_profiles enable row level security;
-create policy if not exists seyaj_profile_self_select on public.seyaj_user_profiles
-for select to authenticated using (id = auth.uid() or public.is_seyaj_admin());
-create policy if not exists seyaj_profile_admin_write on public.seyaj_user_profiles
-for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+create or replace function public.handle_seyaj_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.seyaj_user_profiles(id, full_name, role_code)
+  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email), 'viewer')
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
 
--- Core application access: authenticated users may read; privileged roles may mutate.
--- More granular branch/project scoping is handled by the existing Seyaj scope tables.
+drop trigger if exists on_auth_user_created_seyaj on auth.users;
+create trigger on_auth_user_created_seyaj after insert on auth.users for each row execute function public.handle_seyaj_new_user();
 
-alter table public.clients enable row level security;
-alter table public.sites enable row level security;
-alter table public.projects enable row level security;
-alter table public.employees enable row level security;
-alter table public.attendance enable row level security;
-alter table public.field_visits enable row level security;
-alter table public.contracts enable row level security;
-alter table public.violations enable row level security;
-alter table public.leaves enable row level security;
-alter table public.communication_templates enable row level security;
-alter table public.ai_policies enable row level security;
-alter table public.ai_tasks enable row level security;
-alter table public.communication_log enable row level security;
-alter table public.audit_logs enable row level security;
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT tablename FROM (VALUES
+    ('clients'),('sites'),('projects'),('employees'),('attendance'),('field_visits'),
+    ('contracts'),('communication_templates'),('ai_policies'),('ai_tasks'),('communication_log'),('audit_logs'),('seyaj_user_profiles')
+  ) AS t(tablename)
+  LOOP
+    IF to_regclass('public.' || r.tablename) IS NOT NULL THEN
+      EXECUTE format('alter table public.%I enable row level security', r.tablename);
+    END IF;
+  END LOOP;
+END $$;
 
-create policy if not exists clients_auth_select on public.clients for select to authenticated using (true);
-create policy if not exists clients_admin_write on public.clients for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+DO $$
+BEGIN
+  IF NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='seyaj_user_profiles' and policyname='seyaj_profile_self_select') THEN
+    create policy seyaj_profile_self_select on public.seyaj_user_profiles for select to authenticated using (id=auth.uid() or public.is_seyaj_admin());
+  END IF;
+  IF NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='seyaj_user_profiles' and policyname='seyaj_profile_admin_write') THEN
+    create policy seyaj_profile_admin_write on public.seyaj_user_profiles for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+END $$;
 
-create policy if not exists sites_auth_select on public.sites for select to authenticated using (true);
-create policy if not exists sites_admin_write on public.sites for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+DO $$
+BEGIN
+  IF to_regclass('public.clients') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='clients' and policyname='clients_auth_select') THEN
+    create policy clients_auth_select on public.clients for select to authenticated using (true);
+  END IF;
+  IF to_regclass('public.clients') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='clients' and policyname='clients_admin_write') THEN
+    create policy clients_admin_write on public.clients for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+  IF to_regclass('public.sites') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='sites' and policyname='sites_auth_select') THEN
+    create policy sites_auth_select on public.sites for select to authenticated using (true);
+  END IF;
+  IF to_regclass('public.sites') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='sites' and policyname='sites_admin_write') THEN
+    create policy sites_admin_write on public.sites for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+  IF to_regclass('public.projects') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='projects' and policyname='projects_auth_select') THEN
+    create policy projects_auth_select on public.projects for select to authenticated using (true);
+  END IF;
+  IF to_regclass('public.projects') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='projects' and policyname='projects_admin_write') THEN
+    create policy projects_admin_write on public.projects for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+END $$;
 
-create policy if not exists projects_auth_select on public.projects for select to authenticated using (true);
-create policy if not exists projects_admin_write on public.projects for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+DO $$
+BEGIN
+  IF to_regclass('public.employees') IS NOT NULL THEN
+    IF NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='employees' and policyname='employees_auth_select') THEN
+      create policy employees_auth_select on public.employees for select to authenticated using (auth_user_id=auth.uid() or public.is_seyaj_admin());
+    END IF;
+    IF NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='employees' and policyname='employees_admin_write') THEN
+      create policy employees_admin_write on public.employees for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+    END IF;
+  END IF;
+END $$;
 
-create policy if not exists employees_auth_select on public.employees for select to authenticated using (auth_user_id = auth.uid() or public.is_seyaj_admin());
-create policy if not exists employees_admin_write on public.employees for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+DO $$
+BEGIN
+  IF to_regclass('public.attendance') IS NOT NULL THEN
+    IF NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='attendance' and policyname='attendance_auth_select') THEN
+      create policy attendance_auth_select on public.attendance for select to authenticated using (public.is_seyaj_admin() or employee_number in (select e.employee_number from public.employees e where e.auth_user_id=auth.uid()));
+    END IF;
+    IF NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='attendance' and policyname='attendance_admin_write') THEN
+      create policy attendance_admin_write on public.attendance for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+    END IF;
+  END IF;
+END $$;
 
-create policy if not exists attendance_auth_select on public.attendance for select to authenticated using (public.is_seyaj_admin() or employee_number in (select e.employee_number from public.employees e where e.auth_user_id = auth.uid()));
-create policy if not exists attendance_admin_write on public.attendance for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+DO $$
+BEGIN
+  IF to_regclass('public.field_visits') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='field_visits' and policyname='field_visits_auth_select') THEN
+    create policy field_visits_auth_select on public.field_visits for select to authenticated using (true);
+  END IF;
+  IF to_regclass('public.field_visits') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='field_visits' and policyname='field_visits_admin_write') THEN
+    create policy field_visits_admin_write on public.field_visits for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+  IF to_regclass('public.contracts') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='contracts' and policyname='contracts_auth_select') THEN
+    create policy contracts_auth_select on public.contracts for select to authenticated using (true);
+  END IF;
+  IF to_regclass('public.contracts') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='contracts' and policyname='contracts_admin_write') THEN
+    create policy contracts_admin_write on public.contracts for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+END $$;
 
-create policy if not exists visits_auth_select on public.field_visits for select to authenticated using (true);
-create policy if not exists visits_admin_write on public.field_visits for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+DO $$
+BEGIN
+  IF to_regclass('public.communication_templates') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='communication_templates' and policyname='templates_auth_select') THEN
+    create policy templates_auth_select on public.communication_templates for select to authenticated using (true);
+  END IF;
+  IF to_regclass('public.communication_templates') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='communication_templates' and policyname='templates_admin_write') THEN
+    create policy templates_admin_write on public.communication_templates for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+  IF to_regclass('public.ai_policies') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='ai_policies' and policyname='ai_policies_auth_select') THEN
+    create policy ai_policies_auth_select on public.ai_policies for select to authenticated using (true);
+  END IF;
+  IF to_regclass('public.ai_policies') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='ai_policies' and policyname='ai_policies_admin_write') THEN
+    create policy ai_policies_admin_write on public.ai_policies for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+  IF to_regclass('public.ai_tasks') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='ai_tasks' and policyname='ai_tasks_admin') THEN
+    create policy ai_tasks_admin on public.ai_tasks for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+  IF to_regclass('public.communication_log') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='communication_log' and policyname='communication_log_admin') THEN
+    create policy communication_log_admin on public.communication_log for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+  IF to_regclass('public.audit_logs') IS NOT NULL AND NOT EXISTS (select 1 from pg_policies where schemaname='public' and tablename='audit_logs' and policyname='audit_logs_admin') THEN
+    create policy audit_logs_admin on public.audit_logs for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
+  END IF;
+END $$;
 
-create policy if not exists contracts_auth_select on public.contracts for select to authenticated using (true);
-create policy if not exists contracts_admin_write on public.contracts for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
-
-create policy if not exists violations_auth_select on public.violations for select to authenticated using (public.is_seyaj_admin() or employee_id in (select e.id from public.employees e where e.auth_user_id = auth.uid()));
-create policy if not exists violations_admin_write on public.violations for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
-
-create policy if not exists leaves_auth_select on public.leaves for select to authenticated using (public.is_seyaj_admin() or employee_id in (select e.id from public.employees e where e.auth_user_id = auth.uid()));
-create policy if not exists leaves_admin_write on public.leaves for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
-
-create policy if not exists templates_auth_select on public.communication_templates for select to authenticated using (true);
-create policy if not exists templates_admin_write on public.communication_templates for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
-
-create policy if not exists ai_policies_auth_select on public.ai_policies for select to authenticated using (true);
-create policy if not exists ai_policies_admin_write on public.ai_policies for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
-
-create policy if not exists ai_tasks_auth_select on public.ai_tasks for select to authenticated using (public.is_seyaj_admin());
-create policy if not exists ai_tasks_admin_write on public.ai_tasks for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
-
-create policy if not exists comm_log_auth_select on public.communication_log for select to authenticated using (public.is_seyaj_admin());
-create policy if not exists comm_log_admin_write on public.communication_log for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
-
-create policy if not exists audit_auth_select on public.audit_logs for select to authenticated using (public.is_seyaj_admin());
-create policy if not exists audit_admin_write on public.audit_logs for all to authenticated using (public.is_seyaj_admin()) with check (public.is_seyaj_admin());
-
-insert into public.ai_policies(key,label,mode,description)
-values
+insert into public.ai_policies(key,label,mode,description) values
 ('email_followups','المتابعات البريدية','auto','متابعة العملاء والعروض والعقود عبر البريد.'),
 ('whatsapp_followups','متابعات WhatsApp','approve','إرسال رسائل WhatsApp بعد اعتماد السياسة.'),
 ('external_letters','الخطابات الخارجية','approve','إنشاء وإرسال الخطابات الخارجية.'),
@@ -214,4 +251,4 @@ values
 ('reports','التقارير الدورية','auto','إنشاء التقارير اليومية والأسبوعية والشهرية.'),
 ('contract_alerts','تنبيهات العقود','auto','متابعة العقود القريبة من الانتهاء.'),
 ('escalation','التصعيد الإداري','approve','رفع الحالات الحساسة للإدارة.')
-on conflict (key) do update set label=excluded.label, description=excluded.description;
+on conflict (key) do update set label=excluded.label, mode=excluded.mode, description=excluded.description, updated_at=now();
