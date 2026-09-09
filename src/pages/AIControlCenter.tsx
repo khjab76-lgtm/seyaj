@@ -1,16 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bot, BrainCircuit, CheckCircle2, Mail, MessageCircle, ShieldCheck, SlidersHorizontal, Sparkles, Workflow, FileText, AlertTriangle, Save } from 'lucide-react';
+import { Bot, BrainCircuit, CheckCircle2, Mail, MessageCircle, ShieldCheck, SlidersHorizontal, Sparkles, Workflow, FileText, AlertTriangle, Save, Cloud, CloudOff } from 'lucide-react';
+import { cloudUpdate, getAiPolicies, cloudHealth } from '@/lib/seyajCloud';
 
 const STORAGE_KEY = 'seyaj_ai_control_v1';
-
 type Mode = 'off' | 'suggest' | 'approve' | 'auto';
-
-type Policy = {
-  key: string;
-  label: string;
-  description: string;
-  mode: Mode;
-};
+type Policy = { key: string; label: string; description: string; mode: Mode };
 
 const defaultPolicies: Policy[] = [
   { key: 'email_followups', label: 'المتابعات البريدية', description: 'متابعة العملاء والعروض والعقود عبر البريد الإلكتروني.', mode: 'auto' },
@@ -22,39 +16,52 @@ const defaultPolicies: Policy[] = [
   { key: 'escalation', label: 'التصعيد الإداري', description: 'رفع الحالات المتأخرة أو عالية الخطورة للإدارة.', mode: 'approve' },
 ];
 
-const modeLabels: Record<Mode, string> = {
-  off: 'متوقف',
-  suggest: 'اقتراح فقط',
-  approve: 'يحتاج اعتماد',
-  auto: 'تنفيذ تلقائي',
-};
+const modeLabels: Record<Mode, string> = { off: 'متوقف', suggest: 'اقتراح فقط', approve: 'يحتاج اعتماد', auto: 'تنفيذ تلقائي' };
 
 export default function AIControlCenter() {
   const [enabled, setEnabled] = useState(true);
   const [policies, setPolicies] = useState<Policy[]>(defaultPolicies);
   const [saved, setSaved] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (typeof parsed.enabled === 'boolean') setEnabled(parsed.enabled);
-      if (Array.isArray(parsed.policies)) setPolicies(parsed.policies);
-    } catch { /* use defaults */ }
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.enabled === 'boolean') setEnabled(parsed.enabled);
+        if (Array.isArray(parsed.policies)) setPolicies(parsed.policies);
+      }
+    } catch { /* defaults */ }
+    void (async () => {
+      const health = await cloudHealth();
+      setCloudStatus(health.ok ? 'online' : 'offline');
+      if (!health.ok) return;
+      try {
+        const remote = await getAiPolicies();
+        if (remote.length) {
+          setPolicies((prev) => prev.map((item) => {
+            const found = remote.find((r: any) => r.key === item.key);
+            return found?.mode ? { ...item, mode: found.mode as Mode } : item;
+          }));
+        }
+      } catch { /* keep local settings */ }
+    })();
   }, []);
 
   const autoCount = useMemo(() => policies.filter((p) => p.mode === 'auto').length, [policies]);
   const approvalCount = useMemo(() => policies.filter((p) => p.mode === 'approve').length, [policies]);
+  const setPolicy = (key: string, mode: Mode) => setPolicies((prev) => prev.map((p) => p.key === key ? { ...p, mode } : p));
 
-  const save = () => {
+  const save = async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled, policies, savedAt: new Date().toISOString() }));
+    if (cloudStatus === 'online') {
+      try {
+        for (const p of policies) await cloudUpdate('ai_policies', `key=eq.${encodeURIComponent(p.key)}`, { mode: p.mode });
+      } catch { setCloudStatus('offline'); }
+    }
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1800);
-  };
-
-  const setPolicy = (key: string, mode: Mode) => {
-    setPolicies((prev) => prev.map((p) => p.key === key ? { ...p, mode } : p));
   };
 
   return (
@@ -64,12 +71,18 @@ export default function AIControlCenter() {
           <div>
             <div className="mb-2 flex items-center gap-2 text-amber-300"><Sparkles className="h-5 w-5" /> مركز التحكم بالذكاء الاصطناعي</div>
             <h2 className="font-cairo text-2xl font-extrabold">AI Manager — عقل نظام سياج</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-white/70">تحكم في مستوى استقلالية الذكاء الاصطناعي. كل إجراء حساس يمكن أن يبقى تحت اعتماد الإدارة، بينما الإجراءات المسموح بها تعمل تلقائياً.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-white/70">تحكم في استقلالية الذكاء الاصطناعي وربط قراراته ببيانات النظام الفعلية. الإجراءات الحساسة تبقى تحت اعتماد الإدارة.</p>
           </div>
-          <button onClick={() => setEnabled(!enabled)} className={`flex items-center gap-3 rounded-xl px-5 py-3 font-bold transition ${enabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/70'}`}>
-            <span className={`h-3 w-3 rounded-full ${enabled ? 'bg-white animate-pulse' : 'bg-white/40'}`} />
-            الذكاء الاصطناعي {enabled ? 'مفعّل' : 'متوقف'}
-          </button>
+          <div className="flex flex-col items-end gap-2">
+            <button onClick={() => setEnabled(!enabled)} className={`flex items-center gap-3 rounded-xl px-5 py-3 font-bold transition ${enabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/70'}`}>
+              <span className={`h-3 w-3 rounded-full ${enabled ? 'bg-white animate-pulse' : 'bg-white/40'}`} />
+              الذكاء الاصطناعي {enabled ? 'مفعّل' : 'متوقف'}
+            </button>
+            <div className="flex items-center gap-1.5 text-[11px] text-white/60">
+              {cloudStatus === 'online' ? <Cloud className="h-4 w-4 text-emerald-300" /> : <CloudOff className="h-4 w-4" />}
+              {cloudStatus === 'online' ? 'متصل بقاعدة البيانات السحابية' : cloudStatus === 'checking' ? 'جاري فحص الاتصال' : 'وضع محلي — يلزم جلسة دخول وصلاحية'}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -81,7 +94,7 @@ export default function AIControlCenter() {
 
       <section className="rounded-2xl border bg-card shadow-sm">
         <div className="flex items-center justify-between border-b p-5">
-          <div><h3 className="font-cairo font-bold">سياسات التنفيذ</h3><p className="mt-1 text-xs text-muted-foreground">حدد لكل نوع إجراء هل يقترحه AI أو يحتاج اعتماداً أو ينفذه تلقائياً.</p></div>
+          <div><h3 className="font-cairo font-bold">سياسات التنفيذ</h3><p className="mt-1 text-xs text-muted-foreground">تحفظ محلياً وتُزامن مع Supabase عند وجود جلسة وصلاحية مناسبة.</p></div>
           <SlidersHorizontal className="h-5 w-5 text-muted-foreground" />
         </div>
         <div className="divide-y">
@@ -93,9 +106,7 @@ export default function AIControlCenter() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {(['off', 'suggest', 'approve', 'auto'] as Mode[]).map((mode) => (
-                  <button key={mode} onClick={() => setPolicy(policy.key, mode)} className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${policy.mode === mode ? 'border-slate-900 bg-slate-900 text-white' : 'hover:bg-muted'}`}>
-                    {modeLabels[mode]}
-                  </button>
+                  <button key={mode} onClick={() => setPolicy(policy.key, mode)} className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${policy.mode === mode ? 'border-slate-900 bg-slate-900 text-white' : 'hover:bg-muted'}`}>{modeLabels[mode]}</button>
                 ))}
               </div>
             </div>
@@ -104,12 +115,12 @@ export default function AIControlCenter() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <InfoCard icon={<BrainCircuit className="h-5 w-5" />} title="ذاكرة AI" text="تمهيد طبقة ذاكرة مركزية لحفظ سياق العميل والموظف والموقع والعقد والعمليات السابقة وربطها بالوكلاء." />
-        <InfoCard icon={<MessageCircle className="h-5 w-5" />} title="قنوات التنفيذ" text="Email وWhatsApp Business كقنوات تنفيذ. الإرسال الفعلي يتطلب إعداد بيانات التكامل والاعتماد الرسمي للقناة." />
+        <InfoCard icon={<BrainCircuit className="h-5 w-5" />} title="ذاكرة AI" text="الطبقة السحابية مهيأة لحفظ سياق العميل والموظف والموقع والعقد والعمليات السابقة وربطها بالوكلاء." />
+        <InfoCard icon={<MessageCircle className="h-5 w-5" />} title="قنوات التنفيذ" text="Email وWhatsApp Business جاهزان للربط عبر Edge Functions؛ مفاتيح المزودات لا تُحفظ داخل الواجهة أو GitHub." />
       </div>
 
       <div className="flex justify-end">
-        <button onClick={save} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">
+        <button onClick={() => void save()} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800">
           {saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {saved ? 'تم الحفظ' : 'حفظ إعدادات AI'}
         </button>
@@ -117,19 +128,6 @@ export default function AIControlCenter() {
     </div>
   );
 }
-
-function Stat({ icon, title, value, note }: { icon: React.ReactNode; title: string; value: string; note: string }) {
-  return <div className="rounded-2xl border bg-card p-5 shadow-sm"><div className="flex items-center justify-between"><span className="text-sm font-semibold text-muted-foreground">{title}</span><span className="rounded-lg bg-slate-100 p-2">{icon}</span></div><div className="mt-3 font-cairo text-3xl font-extrabold">{value}</div><div className="mt-1 text-xs text-muted-foreground">{note}</div></div>;
-}
-
-function InfoCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return <div className="rounded-2xl border bg-card p-5 shadow-sm"><div className="flex items-center gap-2 font-cairo font-bold">{icon}{title}</div><p className="mt-3 text-sm leading-7 text-muted-foreground">{text}</p></div>;
-}
-
-function PolicyIcon({ policyKey }: { policyKey: string }) {
-  if (policyKey.includes('email')) return <Mail className="h-4 w-4" />;
-  if (policyKey.includes('whatsapp')) return <MessageCircle className="h-4 w-4" />;
-  if (policyKey.includes('warning')) return <AlertTriangle className="h-4 w-4" />;
-  if (policyKey.includes('letter')) return <FileText className="h-4 w-4" />;
-  return <Workflow className="h-4 w-4" />;
-}
+function Stat({ icon, title, value, note }: { icon: React.ReactNode; title: string; value: string; note: string }) { return <div className="rounded-2xl border bg-card p-5 shadow-sm"><div className="flex items-center justify-between"><span className="text-sm font-semibold text-muted-foreground">{title}</span><span className="rounded-lg bg-slate-100 p-2">{icon}</span></div><div className="mt-3 font-cairo text-3xl font-extrabold">{value}</div><div className="mt-1 text-xs text-muted-foreground">{note}</div></div>; }
+function InfoCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) { return <div className="rounded-2xl border bg-card p-5 shadow-sm"><div className="flex items-center gap-2 font-cairo font-bold">{icon}{title}</div><p className="mt-3 text-sm leading-7 text-muted-foreground">{text}</p></div>; }
+function PolicyIcon({ policyKey }: { policyKey: string }) { if (policyKey.includes('email')) return <Mail className="h-4 w-4" />; if (policyKey.includes('whatsapp')) return <MessageCircle className="h-4 w-4" />; if (policyKey.includes('warning')) return <AlertTriangle className="h-4 w-4" />; if (policyKey.includes('letter')) return <FileText className="h-4 w-4" />; return <Workflow className="h-4 w-4" />; }
