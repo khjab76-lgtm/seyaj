@@ -15,6 +15,7 @@ import Roles from '@/pages/Roles';
 import Requests from '@/pages/Requests';
 import Patrols from '@/pages/Patrols';
 import Handovers from '@/pages/Handovers';
+import Custody from '@/pages/Custody';
 import Reports from '@/pages/Reports';
 import SmartReports from '@/pages/SmartReports';
 import Settings from '@/pages/Settings';
@@ -35,12 +36,12 @@ import MapCenter from '@/pages/MapCenter';
 import AuthReturn from '@/pages/AuthReturn';
 import Alerts from '@/pages/Alerts';
 import AuditLog from '@/pages/AuditLog';
-import AIControlCenter from '@/pages/AIControlCenter';
 import Login from '@/pages/Login';
+import Monitor from '@/pages/Monitor';
 
 const queryClient = new QueryClient();
 
-function AuthGate({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const requireAuth = import.meta.env.VITE_REQUIRE_AUTH === 'true';
   const { user, loading } = useAuth();
   if (!requireAuth) return <>{children}</>;
@@ -52,9 +53,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<Login />} />
+    <Route path="/monitor" element={<Monitor />} />
     <Route path="/app" element={<MobileApp />} />
     <Route path="/auth/callback" element={<AuthReturn />} />
-    <Route element={<AuthGate><Layout /></AuthGate>}>
+    <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
       <Route path="/" element={<Dashboard />} />
       <Route path="/employees" element={<Employees />} />
       <Route path="/attendance" element={<Attendance />} />
@@ -65,6 +67,7 @@ const AppRoutes = () => (
       <Route path="/requests" element={<Requests />} />
       <Route path="/patrols" element={<Patrols />} />
       <Route path="/handovers" element={<Handovers />} />
+      <Route path="/custody" element={<Custody />} />
       <Route path="/alerts" element={<Alerts />} />
       <Route path="/audit" element={<AuditLog />} />
       <Route path="/reports" element={<Reports />} />
@@ -84,7 +87,6 @@ const AppRoutes = () => (
       <Route path="/hr/import-employees" element={<ImportEmployees />} />
       <Route path="/hr/import-payroll" element={<ImportPayroll />} />
       <Route path="/map-center" element={<MapCenter />} />
-      <Route path="/ai-control" element={<AIControlCenter />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
   </Routes>
