@@ -3,6 +3,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { StoreProvider } from '@/lib/store';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
 import Dashboard from '@/pages/Dashboard';
 import Employees from '@/pages/Employees';
@@ -35,14 +36,25 @@ import AuthReturn from '@/pages/AuthReturn';
 import Alerts from '@/pages/Alerts';
 import AuditLog from '@/pages/AuditLog';
 import AIControlCenter from '@/pages/AIControlCenter';
+import Login from '@/pages/Login';
 
 const queryClient = new QueryClient();
 
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const requireAuth = import.meta.env.VITE_REQUIRE_AUTH === 'true';
+  const { user, loading } = useAuth();
+  if (!requireAuth) return <>{children}</>;
+  if (loading) return <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">جاري التحقق من الجلسة...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
 const AppRoutes = () => (
   <Routes>
+    <Route path="/login" element={<Login />} />
     <Route path="/app" element={<MobileApp />} />
     <Route path="/auth/callback" element={<AuthReturn />} />
-    <Route element={<Layout />}>
+    <Route element={<AuthGate><Layout /></AuthGate>}>
       <Route path="/" element={<Dashboard />} />
       <Route path="/employees" element={<Employees />} />
       <Route path="/attendance" element={<Attendance />} />
@@ -80,14 +92,16 @@ const AppRoutes = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <StoreProvider>
-      <TooltipProvider>
-        <Toaster />
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </TooltipProvider>
-    </StoreProvider>
+    <AuthProvider>
+      <StoreProvider>
+        <TooltipProvider>
+          <Toaster />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </TooltipProvider>
+      </StoreProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
