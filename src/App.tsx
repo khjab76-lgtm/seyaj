@@ -34,6 +34,7 @@ import MapCenter from '@/pages/MapCenter';
 import AuthReturn from '@/pages/AuthReturn';
 import Alerts from '@/pages/Alerts';
 import AuditLog from '@/pages/AuditLog';
+import AIControlCenter from '@/pages/AIControlCenter';
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const AppRoutes = () => (
       <Route path="/hr/import-employees" element={<ImportEmployees />} />
       <Route path="/hr/import-payroll" element={<ImportPayroll />} />
       <Route path="/map-center" element={<MapCenter />} />
+      <Route path="/ai-control" element={<AIControlCenter />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
   </Routes>
