@@ -39,75 +39,10 @@ import AuditLog from '@/pages/AuditLog';
 import Login from '@/pages/Login';
 import Monitor from '@/pages/Monitor';
 import BusinessHub from '@/pages/BusinessHub';
+import AIControlCenter from '@/pages/AIControlCenter';
 
 const queryClient = new QueryClient();
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const requireAuth = import.meta.env.VITE_REQUIRE_AUTH === 'true';
-  const { user, loading } = useAuth();
-  if (!requireAuth) return <>{children}</>;
-  if (loading) return <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">جاري التحقق من الجلسة...</div>;
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-const AppRoutes = () => (
-  <Routes>
-    <Route path="/login" element={<Login />} />
-    <Route path="/monitor" element={<Monitor />} />
-    <Route path="/app" element={<MobileApp />} />
-    <Route path="/auth/callback" element={<AuthReturn />} />
-    <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/business" element={<BusinessHub />} />
-      <Route path="/employees" element={<Employees />} />
-      <Route path="/attendance" element={<Attendance />} />
-      <Route path="/projects" element={<Projects />} />
-      <Route path="/sites" element={<Sites />} />
-      <Route path="/zones" element={<Zones />} />
-      <Route path="/roles" element={<Roles />} />
-      <Route path="/requests" element={<Requests />} />
-      <Route path="/patrols" element={<Patrols />} />
-      <Route path="/handovers" element={<Handovers />} />
-      <Route path="/custody" element={<Custody />} />
-      <Route path="/alerts" element={<Alerts />} />
-      <Route path="/audit" element={<AuditLog />} />
-      <Route path="/reports" element={<Reports />} />
-      <Route path="/smart-reports" element={<SmartReports />} />
-      <Route path="/sites-capacity" element={<SitesCapacity />} />
-      <Route path="/field-visits" element={<FieldVisits />} />
-      <Route path="/violations" element={<Violations />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/finance" element={<Finance />} />
-      <Route path="/hr/leaves" element={<HrLeaves />} />
-      <Route path="/hr/payroll" element={<HrPayroll />} />
-      <Route path="/hr/employees" element={<HrEmployees />} />
-      <Route path="/hr/employees/:code" element={<HrEmployees />} />
-      <Route path="/hr/audit" element={<HrAudit />} />
-      <Route path="/hr/dashboard" element={<HrDashboard />} />
-      <Route path="/recruitment" element={<Recruitment />} />
-      <Route path="/hr/import-employees" element={<ImportEmployees />} />
-      <Route path="/hr/import-payroll" element={<ImportPayroll />} />
-      <Route path="/map-center" element={<MapCenter />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Route>
-  </Routes>
-);
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <StoreProvider>
-        <TooltipProvider>
-          <Toaster />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
-      </StoreProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
-
-export default App;
-export { AppRoutes };
+function ProtectedRoute({ children }: { children: React.ReactNode }) { const requireAuth = import.meta.env.VITE_REQUIRE_AUTH === 'true'; const { user, loading } = useAuth(); if (!requireAuth) return <>{children}</>; if (loading) return <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">جاري التحقق من الجلسة...</div>; if (!user) return <Navigate to="/login" replace />; return <>{children}</>; }
+const AppRoutes = () => (<Routes><Route path="/login" element={<Login />} /><Route path="/monitor" element={<Monitor />} /><Route path="/app" element={<MobileApp />} /><Route path="/auth/callback" element={<AuthReturn />} /><Route element={<ProtectedRoute><Layout /></ProtectedRoute>}><Route path="/" element={<Dashboard />} /><Route path="/business" element={<BusinessHub />} /><Route path="/ai-control" element={<AIControlCenter />} /><Route path="/employees" element={<Employees />} /><Route path="/attendance" element={<Attendance />} /><Route path="/projects" element={<Projects />} /><Route path="/sites" element={<Sites />} /><Route path="/zones" element={<Zones />} /><Route path="/roles" element={<Roles />} /><Route path="/requests" element={<Requests />} /><Route path="/patrols" element={<Patrols />} /><Route path="/handovers" element={<Handovers />} /><Route path="/custody" element={<Custody />} /><Route path="/alerts" element={<Alerts />} /><Route path="/audit" element={<AuditLog />} /><Route path="/reports" element={<Reports />} /><Route path="/smart-reports" element={<SmartReports />} /><Route path="/sites-capacity" element={<SitesCapacity />} /><Route path="/field-visits" element={<FieldVisits />} /><Route path="/violations" element={<Violations />} /><Route path="/settings" element={<Settings />} /><Route path="/finance" element={<Finance />} /><Route path="/hr/leaves" element={<HrLeaves />} /><Route path="/hr/payroll" element={<HrPayroll />} /><Route path="/hr/employees" element={<HrEmployees />} /><Route path="/hr/employees/:code" element={<HrEmployees />} /><Route path="/hr/audit" element={<HrAudit />} /><Route path="/hr/dashboard" element={<HrDashboard />} /><Route path="/recruitment" element={<Recruitment />} /><Route path="/hr/import-employees" element={<ImportEmployees />} /><Route path="/hr/import-payroll" element={<ImportPayroll />} /><Route path="/map-center" element={<MapCenter />} /><Route path="*" element={<Navigate to="/" replace />} /></Route></Routes>);
+const App = () => (<QueryClientProvider client={queryClient}><AuthProvider><StoreProvider><TooltipProvider><Toaster /><BrowserRouter><AppRoutes /></BrowserRouter></TooltipProvider></StoreProvider></AuthProvider></QueryClientProvider>);
+export default App; export { AppRoutes };
